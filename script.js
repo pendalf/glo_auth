@@ -7,14 +7,23 @@ const userName = document.querySelector('#username'),
     login = document.querySelector('#login'),
     userList = document.querySelector('#user-list');
 
-let userData = localStorage.userList ? JSON.parse(localStorage.userList) : [];
+let userData = localStorage.userList ? JSON.parse(localStorage.userList) : [],
+    loggedIn = localStorage.loggedIn ? localStorage.loggedIn : null;
 
 const setLocalStorage = function() {
     localStorage.userList = JSON.stringify(userData);
 };
+const setLocalStorageLoggedIn = function() {
+    localStorage.loggedIn = loggedIn;
+};
 
 let isNumber = function(n) {
     return !isNaN(parseFloat(n)) && isFinite(n);
+};
+
+// Функция поиска зарегистрированного пользователя
+const findUser = function(user) {
+    return userData.filter(item => item.login === user)[0] || false;
 };
 
 // Функция для получения фразы с первой заглавной буквы
@@ -42,7 +51,6 @@ const askUser = (type, correct, incorrect, defValue = '', repeat = false) => {
 
         case 'fullName':
             text = text ? text.replace(/[\s]+/g, ' ').trim() : text;
-            console.log(text);
             const wordsCount = text ? text.split(' ').length : text;
             text = (isNumber(text) || text === null || text === '' || wordsCount > 2 || wordsCount < 2) ?
                 askUser(type, correct, incorrect, defValue, true) : text;
@@ -51,6 +59,13 @@ const askUser = (type, correct, incorrect, defValue = '', repeat = false) => {
 
         case 'password':
             text = text === null || text === '' ? askUser(type, correct, incorrect, defValue, true) : text;
+
+            break;
+
+        case 'login':
+            text = text ? text.replace(/[\s]+/g, ' ').trim() : text;
+            const userExist = findUser(text);
+            text = userExist || text === null || text === '' ? askUser(type, correct, incorrect, defValue, true) : text;
 
             break;
 
@@ -75,25 +90,44 @@ const render = function() {
                 second: '2-digit'
             },
             register = new Date(item.register).toLocaleDateString('ru-RU', dateOptions);
-        let output = ''
+        let output = '';
         li.classList.add('user-item');
-        li.dataset.index = i;
 
         output += '<span class="user-item__first-name">Имя: ' + item.firstName + '</span>';
         output += '<span class="user-item__last-name">, фамилия: ' + item.lastName + '</span>';
         output += '<span class="user-item__register">, зарегистрирован: ' + register + '</span>';
+        output += '<button class="user-item__delete">Удалить</button>';
 
         li.innerHTML = output;
 
         userList.append(li);
+
+        const userDelete = li.querySelector('.user-item__delete');
+
+        userDelete.addEventListener('click', function() {
+            userData.splice(i, 1);
+            setLocalStorage();
+            if (!findUser(loggedIn)) {
+                loggedIn = null;
+                setLocalStorageLoggedIn();
+            }
+            render();
+        });
     });
+
+    if (loggedIn && findUser(loggedIn)) {
+        const user = findUser(loggedIn);
+        userName.textContent = user.firstName;
+    } else {
+        userName.textContent = 'Аноним';
+    }
 
 };
 
 userRegister.addEventListener('click', function() {
     const userFullName = askUser('fullName', 'Введите имя и фамилию', 'Вы ввели не коррректные данные, повторите ввод имени и фамилии', 'Василий Алибабаевич'),
         userFullNameSplit = userFullName.split(' '),
-        userName = askUser(String, 'Введите login', 'Вы ввели не коррректные данные, логин должен содержать буквы. Повторите ввод', 'Vasya'),
+        userName = askUser('login', 'Введите login', 'Такой пользователь существует или неправильно ввели имя, повторите ввод', 'Vasya' + userData.length),
         password = askUser('password', 'Введите пароль', 'Вы ввели не коррректные данные, пароль должен содержать буквы. Повторите ввод', '12345'),
         user = {
             login: userName,
@@ -106,6 +140,24 @@ userRegister.addEventListener('click', function() {
     setLocalStorage();
     render();
 
+});
+
+login.addEventListener('click', function() {
+    const userName = askUser(String, 'Введите login', 'Вы ввели не коррректные данные, логин должен содержать буквы. Повторите ввод', 'Vasya'),
+        password = askUser('password', 'Введите пароль', 'Вы ввели не коррректные данные, пароль должен содержать буквы. Повторите ввод', '12345'),
+        user = findUser(userName);
+    if (user) {
+        if (user.password === password) {
+            loggedIn = user.login;
+            setLocalStorageLoggedIn();
+            render();
+        } else {
+            alert('Не правильный пароль');
+        }
+
+    } else {
+        alert('Пользователь не найден');
+    }
 });
 
 render();
